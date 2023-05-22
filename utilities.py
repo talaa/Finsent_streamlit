@@ -6,9 +6,11 @@ import yfinance as yf
 from newspaper import Config
 from tqdm import tqdm
 from GoogleNews import GoogleNews
+#import datetime
 from datetime import datetime
 from newspaper import Article
 from pandas.core.reshape.merge import merge_asof
+from pandas import ExcelWriter
 #### Sentiment Requirements 
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.layers.experimental import preprocessing
@@ -28,6 +30,10 @@ config = Config()
 config.browser_user_agent = user_agent
 import nltk
 nltk.download('punkt')
+nd=pd.DataFrame()
+sd=pd.DataFrame()
+asod=pd.DataFrame()
+orig=pd.DataFrame()
 
 def clean_date(date_string):
     try:
@@ -76,8 +82,10 @@ def get_news_data(company,days):
       googlenews.search(company + " financial news")
       googlenews.getpage(i)
       results = googlenews.result()
+      
       #new df
       re_df = pd.DataFrame(results)
+      orig=re_df
       re_df.replace('', np.nan, inplace=True)
       re_df.dropna(subset=['title'], inplace=True)
       # Convert DateTimeColumn to datetime
@@ -130,7 +138,7 @@ def get_news_data(company,days):
   #df['datetime'] = pd.to_datetime(df['datetime'],unit='s')
   df[['Pos', 'Neg', 'Neutral']] = df[['Pos', 'Neg', 'Neutral']].apply(lambda x: x*100)
   df.drop_duplicates(subset=['title'], inplace=True)
-  ss_df = df.reset_index()
+  #ss_df = df.reset_index()
   #df.drop('index', axis=1, inplace=True)
   df.set_index('datetime', inplace=True)
   df.index.rename('Date', inplace=True)
@@ -144,7 +152,8 @@ def SentimentAnalyzer(doc):
     return pt_predictions.detach().cpu().numpy()
 @st.cache_data
 def get_stock_data(Tick):
-    today = datetime.date.today()
+    #today = datetime.date.today()
+    today = datetime.today().date()
     tick = yf.download(Tick, '2023-1-1', today)
     return tick
 
@@ -164,5 +173,22 @@ def merge(company,days):
   # sort the index in ascending order
   # sort the index in descending order
   asof.sort_index(ascending=False, inplace=True)
-  print(asof)
+  nd=news_data
+  sd=stock_data
+  asod=asof
   return asof
+def download():
+    
+    # Create a Pandas Excel writer using XlsxWriter as the engine.
+    desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+    writer = pd.ExcelWriter(desktop + '/output.xlsx', engine='xlsxwriter')
+    #writer = pd.ExcelWriter('output.xlsx', engine='xlsxwriter')
+
+    # Write each dataframe to a different worksheet.
+    nd.to_excel(writer, sheet_name='news_data')
+    sd.to_excel(writer, sheet_name='stock_data')
+    asod.to_excel(writer, sheet_name='merge_data')
+    orig.to_excel(writer,sheet_name='results')
+
+    # Close the Pandas Excel writer and output the Excel file.
+    writer.close()
