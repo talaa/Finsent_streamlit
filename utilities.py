@@ -1,10 +1,11 @@
+import os
 import streamlit as st
 import re
 import numpy as np
 import pandas as pd
 import yfinance as yf
 from newspaper import Config
-from tqdm import tqdm
+from stqdm import stqdm
 from GoogleNews import GoogleNews
 #import datetime
 from datetime import datetime
@@ -47,7 +48,14 @@ def clean_date(date_string):
             'un': 'Jun',
             'an': 'Jan',
             'ct': 'Oct',
-            'pr': 'Apr'
+            'pr': 'Apr',
+            'ul': 'Jul',
+            'eb': 'Feb',
+            'ay': 'May',
+            'ug': 'Aug',
+            'ep': 'Sep',
+            'ov': 'Nov',
+            'ec': 'Dec'
             # Add more mappings as needed for missing or abbreviated month names
         }
         #match = re.search(r'(\D+)(\d+)(?:,\s)?(\d+)', date_string)
@@ -64,86 +72,106 @@ def clean_date(date_string):
             raise ValueError("Invalid date format")
 @st.cache_data        
 def get_news_data(company,days):
-  # Define the columns you want in your DataFrame
-  columns = ["title", "datetime", "desc", "source", "article", "keywords", "Pos", "Neg", "Neutral"]
+    #setting variables 
+    pages=5
+    # get the company Name 
+    co = yf.Ticker(company)
+    company_name = co.info['longName']
+    # Define the columns you want in your DataFrame
+    columns = ["title", "datetime", "desc", "source", "article", "keywords", "Pos", "Neg", "Neutral"]
 
-  # Create an empty DataFrame with the columns you defined
-  df = pd.DataFrame(columns=columns)
+    # Create an empty DataFrame with the columns you defined
+    df = pd.DataFrame(columns=columns)
 
-  # Create a GoogleNews object
-  googlenews = GoogleNews()
+    # Create a GoogleNews object
+    googlenews = GoogleNews()
+    period=str(days)+'d'
+    googlenews.setperiod(period) 
+    googlenews.search(company_name + " financial news")
+    num_pages = googlenews.total_count()
+    
+    results = googlenews.result()
+    
+    #re_df.drop_duplicates(subset=['title'], inplace=True)
+    print('the len of results is ',len(results),' The num of pages is ',num_pages)
 
-  # Create an empty set to store unique article titles
-  unique_titles = set()
+    # Create an empty set to store unique article titles
+    unique_titles = set()
+    st.info('we are analyzing '+str(pages*10)+' articles,  please wait !',icon="ℹ️")
+    # Create an empty list to store the news articles
+    news_articles = []
+    # Create an empty list to store the news articles, icon="ℹ️")
 
-  # Loop through each company and get the news articles
-  
-  for i in tqdm(range(1, int(days/10))):
-      googlenews.search(company + " financial news")
-      googlenews.getpage(i)
-      results = googlenews.result()
-      
-      #new df
-      re_df = pd.DataFrame(results)
-      orig=re_df
-      re_df.replace('', np.nan, inplace=True)
-      re_df.dropna(subset=['title'], inplace=True)
-      # Convert DateTimeColumn to datetime
-      re_df['datetime'] = pd.to_datetime(re_df['datetime'])
+    # Loop through each company and get the news articles
+    for i in stqdm(range(1, pages)):
+    #for i in tqdm(range(1, int(days/10))):
+    
+        # Set the period and language of the news articles you want to get
+        
+        googlenews.getpage(i)
+        
+        
+        #new df
+        re_df = pd.DataFrame(results)
+        st.session_state.orig=re_df
+        re_df.replace('', np.nan, inplace=True)
+        re_df.dropna(subset=['title'], inplace=True)
+        # Convert DateTimeColumn to datetime
+        re_df['datetime'] = pd.to_datetime(re_df['datetime'])
 
-      # Create a new column with cleaned dates
-      re_df['cleaned_date'] = re_df['datetime'].dt.date
+        # Create a new column with cleaned dates
+        re_df['cleaned_date'] = re_df['datetime'].dt.date
 
 
-      # Clean and transform dates in DateColumn only if corresponding entry in DateTimeColumn is empty
-      re_df.loc[re_df['datetime'].isna(), 'cleaned_date'] = re_df.loc[re_df['datetime'].isna(), 'date'].apply(clean_date)
-      re_df.drop_duplicates(subset=['title'], inplace=True)
-      re_df.drop(['date','datetime','img'], axis=1, inplace=True)
-      re_df.rename(columns={'cleaned_date':'datetime'}, inplace=True)
-      
-      
+        # Clean and transform dates in DateColumn only if corresponding entry in DateTimeColumn is empty
+        re_df.loc[re_df['datetime'].isna(), 'cleaned_date'] = re_df.loc[re_df['datetime'].isna(), 'date'].apply(clean_date)
+        re_df.drop_duplicates(subset=['title'], inplace=True)
+        re_df.drop(['date','datetime','img'], axis=1, inplace=True)
+        re_df.rename(columns={'cleaned_date':'datetime'}, inplace=True)
+        
+        
 
-      # Loop through each article and add it to the DataFrame
-      for index, row in re_df.iterrows():
-          result = row.to_dict()
-          date_str = result["datetime"].strftime('%Y-%m-%d %H:%M:%S.%f')
-          date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f')
-          if (datetime.now() - date_obj).days <= days :
-              
-              article = Article(result["link"],config=config)
-              try:
-                article.download()
-                article.parse()
-              except Exception as e:
-                 print(f"Error while downloading article: {e}")
-                 continue
-              unique_titles.add(result['title'])
-              
-              article.nlp()
-              sentiment = SentimentAnalyzer(article.text)
-              #print(result['title'])
-              df = pd.concat([df, pd.DataFrame({
-                  "title": [result["title"]],
-                  "datetime": [result["datetime"]],
-                  "desc": [result["desc"]],
-                  "source": [result["media"]],
-                  "article": [result["link"]],
-                  "keywords": [', '.join(article.keywords)],
-                  "Pos": [sentiment[0][0]],
-                  "Neg": [sentiment[0][1]],
-                  "Neutral": [sentiment[0][2]]
-              })])
+        # Loop through each article and add it to the DataFrame
+        for index, row in re_df.iterrows():
+            result = row.to_dict()
+            date_str = result["datetime"].strftime('%Y-%m-%d %H:%M:%S.%f')
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f')
+            if (datetime.now() - date_obj).days <= days :
+                
+                article = Article(result["link"],config=config)
+                try:
+                    article.download()
+                    article.parse()
+                except Exception as e:
+                    print(f"Error while downloading article: {e}")
+                    continue
+                unique_titles.add(result['title'])
+                
+                article.nlp()
+                sentiment = SentimentAnalyzer(article.text)
+                #print(result['title'])
+                df = pd.concat([df, pd.DataFrame({
+                    "title": [result["title"]],
+                    "datetime": [result["datetime"]],
+                    "desc": [result["desc"]],
+                    "source": [result["media"]],
+                    "article": [result["link"]],
+                    "keywords": [', '.join(article.keywords)],
+                    "Pos": [sentiment[0][0]],
+                    "Neg": [sentiment[0][1]],
+                    "Neutral": [sentiment[0][2]]
+                })])
 
-  # Print the DataFrame
-  #df['datetime'] = pd.to_datetime(df['datetime'],unit='s')
-  df[['Pos', 'Neg', 'Neutral']] = df[['Pos', 'Neg', 'Neutral']].apply(lambda x: x*100)
-  df.drop_duplicates(subset=['title'], inplace=True)
-  #ss_df = df.reset_index()
-  #df.drop('index', axis=1, inplace=True)
-  df.set_index('datetime', inplace=True)
-  df.index.rename('Date', inplace=True)
-  
-  return df
+    # Print the DataFrame
+    #df['datetime'] = pd.to_datetime(df['datetime'],unit='s')
+    df[['Pos', 'Neg', 'Neutral']] = df[['Pos', 'Neg', 'Neutral']].apply(lambda x: x*100)
+    df.drop_duplicates(subset=['title'], inplace=True)
+    #ss_df = df.reset_index()
+    #df.drop('index', axis=1, inplace=True)
+    df.set_index('datetime', inplace=True)
+    df.index.rename('Date', inplace=True)
+    
+    return df
 @st.cache_data
 def SentimentAnalyzer(doc):
     pt_batch = tokenizer(doc,padding=True,truncation=True,max_length=512,return_tensors="pt")
@@ -157,38 +185,51 @@ def get_stock_data(Tick):
     tick = yf.download(Tick, '2023-1-1', today)
     return tick
 
-
+@st.cache_data
 def merge(company,days):
-  news_data=get_news_data(company,days)
-  stock_data=get_stock_data(company)
-  news_data.index = pd.to_datetime(news_data.index)
-  stock_data.index=pd.to_datetime(stock_data.index)
-  asof=merge_asof(news_data.sort_values('Date'),stock_data.sort_values('Date'),on='Date',allow_exact_matches=False)
-  # convert the 'Date' column to datetime format
-  asof['Date'] = pd.to_datetime(asof['Date'])
+    news_data=get_news_data(company,days)
+    stock_data=get_stock_data(company)
+    news_data.index = pd.to_datetime(news_data.index)
+    stock_data.index=pd.to_datetime(stock_data.index)
+    asof=merge_asof(news_data.sort_values('Date'),stock_data.sort_values('Date'),on='Date',allow_exact_matches=False)
+    # convert the 'Date' column to datetime format
+    asof['Date'] = pd.to_datetime(asof['Date'])
 
-  # set the 'Date' column as the index
-  asof.set_index('Date', inplace=True)
+    # set the 'Date' column as the index
+    asof.set_index('Date', inplace=True)
+    co = yf.Ticker(company)
+    company_name = co.info['longName']
+    st.write('we Have analyzed '+str(len(asof))+' articles about'+company_name+'from Today till '+days+'d ago')
+    # sort the index in ascending order
+    # sort the index in descending order
+    asof.sort_index(ascending=False, inplace=True)
+    st.session_state.nd=news_data
+    st.session_state.sd=stock_data
+    st.session_state.asod=asof
+    return asof
 
-  # sort the index in ascending order
-  # sort the index in descending order
-  asof.sort_index(ascending=False, inplace=True)
-  nd=news_data
-  sd=stock_data
-  asod=asof
-  return asof
 def download():
     
     # Create a Pandas Excel writer using XlsxWriter as the engine.
-    desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-    writer = pd.ExcelWriter(desktop + '/output.xlsx', engine='xlsxwriter')
-    #writer = pd.ExcelWriter('output.xlsx', engine='xlsxwriter')
+    #desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+    #writer = pd.ExcelWriter(desktop + '/output.xlsx', engine='xlsxwriter')
+    writer = pd.ExcelWriter('output.xlsx', engine='xlsxwriter')
 
     # Write each dataframe to a different worksheet.
-    nd.to_excel(writer, sheet_name='news_data')
-    sd.to_excel(writer, sheet_name='stock_data')
-    asod.to_excel(writer, sheet_name='merge_data')
-    orig.to_excel(writer,sheet_name='results')
+    st.session_state.nd.to_excel(writer, sheet_name='news_data')
+    st.session_state.sd.to_excel(writer, sheet_name='stock_data')
+    st.session_state.asod.to_excel(writer, sheet_name='merge_data')
+    st.session_state.orig.to_excel(writer,sheet_name='results')
 
     # Close the Pandas Excel writer and output the Excel file.
     writer.close()
+def write_analysis(final_df):
+    # get the average for the pos,neg,neutral columns 
+    pos_avg = final_df['Pos'].mean()
+    neg_avg = final_df['Neg'].mean()
+    neutral_avg = final_df['Neutral'].mean()
+    # get the number of Rows for input dataframe
+    num_rows = final_df.shape[0]
+    #get the number of unique articles sources 
+    num_uni_sources = final_df['source'].nunique()
+    return [pos_avg,neg_avg,neutral_avg,num_rows,num_uni_sources]
