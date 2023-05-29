@@ -97,7 +97,7 @@ def get_news_data(company,days):
 
     # Create an empty set to store unique article titles
     unique_titles = set()
-    st.info('we are analyzing '+str(pages*10)+' articles,  please wait !',icon="ℹ️")
+    st.info('we are analyzing multiple articles,  please wait !',icon="ℹ️")
     # Create an empty list to store the news articles
     news_articles = []
     # Create an empty list to store the news articles, icon="ℹ️")
@@ -113,6 +113,7 @@ def get_news_data(company,days):
         
         #new df
         re_df = pd.DataFrame(results)
+        re_df['Tick']=company
         st.session_state.orig=re_df
         re_df.replace('', np.nan, inplace=True)
         re_df.dropna(subset=['title'], inplace=True)
@@ -186,7 +187,7 @@ def get_stock_data(Tick):
     return tick
 
 @st.cache_data
-def merge(company,days):
+def fetch(company,days):
     news_data=get_news_data(company,days)
     stock_data=get_stock_data(company)
     news_data.index = pd.to_datetime(news_data.index)
@@ -199,8 +200,13 @@ def merge(company,days):
     asof.set_index('Date', inplace=True)
     co = yf.Ticker(company)
     company_name = co.info['longName']
-    st.write('we Have analyzed '+str(len(asof))+' articles about'+company_name+'from Today till '+days+'d ago')
-    # sort the index in ascending order
+    #st.write('we Have analyzed '+str(len(asof))+' articles about'+company_name+'from Today till '+days+'d ago')
+    # adding the name of the tick 
+    news_data['Tick']=company
+    stock_data['Tick']=company
+    asof['Tick']=company
+    # sshow the results 
+    st.success('we Have analyzed '+str(len(asof))+' articles about '+company_name+'from Today till '+str(days)+'d ago '+'from '+str(asof['source'].nunique())+' different sources',icon="✅")
     # sort the index in descending order
     asof.sort_index(ascending=False, inplace=True)
     st.session_state.nd=news_data
@@ -211,9 +217,9 @@ def merge(company,days):
 def download():
     
     # Create a Pandas Excel writer using XlsxWriter as the engine.
-    #desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-    #writer = pd.ExcelWriter(desktop + '/output.xlsx', engine='xlsxwriter')
-    writer = pd.ExcelWriter('output.xlsx', engine='xlsxwriter')
+    desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+    writer = pd.ExcelWriter(desktop + '/output.xlsx', engine='xlsxwriter')
+    #writer = pd.ExcelWriter('output.xlsx', engine='xlsxwriter')
 
     # Write each dataframe to a different worksheet.
     st.session_state.nd.to_excel(writer, sheet_name='news_data')
