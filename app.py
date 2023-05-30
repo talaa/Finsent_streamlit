@@ -21,14 +21,14 @@ with st.form("my_form"):
         
         st.dataframe(df.style.highlight_max(axis=1,subset=['Pos','Neg','Neutral'], props='color:white; font-weight:bold; background-color:darkblue;'))
 #st.dataframe(df)
-
-st.download_button(
-    label="Download XLS",
-    data=download(),
-    file_name="NewsFinancialAnalysis.xlsx",
-    mime="application/vnd.ms-excel"
-    
-)
+if not df.empty :
+  
+        st.download_button(
+          label="Download XLS",
+          data=download(),
+          file_name="NewsFinancialAnalysis.xlsx",
+          mime="application/vnd.ms-excel"
+        )
 
 #st.button('Download XLS',on_click=download)
-st.write('The file will be downloaded to the Desktop')
+
