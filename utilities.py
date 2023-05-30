@@ -7,7 +7,7 @@ import yfinance as yf
 from newspaper import Config
 from stqdm import stqdm
 from GoogleNews import GoogleNews
-#import datetime
+from io import BytesIO
 from datetime import datetime
 from newspaper import Article
 from pandas.core.reshape.merge import merge_asof
@@ -217,9 +217,10 @@ def fetch(company,days):
 def download():
     
     # Create a Pandas Excel writer using XlsxWriter as the engine.
-    desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-    writer = pd.ExcelWriter(desktop + '/output.xlsx', engine='xlsxwriter')
-    #writer = pd.ExcelWriter('output.xlsx', engine='xlsxwriter')
+    #desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+    #writer = pd.ExcelWriter(desktop + '/output.xlsx', engine='xlsxwriter')
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='xlsxwriter')
 
     # Write each dataframe to a different worksheet.
     st.session_state.nd.to_excel(writer, sheet_name='news_data')
@@ -229,13 +230,5 @@ def download():
 
     # Close the Pandas Excel writer and output the Excel file.
     writer.close()
-def write_analysis(final_df):
-    # get the average for the pos,neg,neutral columns 
-    pos_avg = final_df['Pos'].mean()
-    neg_avg = final_df['Neg'].mean()
-    neutral_avg = final_df['Neutral'].mean()
-    # get the number of Rows for input dataframe
-    num_rows = final_df.shape[0]
-    #get the number of unique articles sources 
-    num_uni_sources = final_df['source'].nunique()
-    return [pos_avg,neg_avg,neutral_avg,num_rows,num_uni_sources]
+    processed_data = output.getvalue()
+    return processed_data

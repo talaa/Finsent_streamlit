@@ -18,8 +18,17 @@ with st.form("my_form"):
         print(df.columns)
         df=df.reindex(columns=['title','source','Pos','Neg','Neutral','Open','Close','Volume','High','Low','Adj Close','desc','article'])
         df.reset_index(inplace=True)
-        #print(df.columns)
+        
         st.dataframe(df.style.highlight_max(axis=1,subset=['Pos','Neg','Neutral'], props='color:white; font-weight:bold; background-color:darkblue;'))
 #st.dataframe(df)
-st.button('Download XLS',on_click=download)
+
+st.download_button(
+    label="Download XLS",
+    data=download(),
+    file_name="NewsFinancialAnalysis.xlsx",
+    mime="application/vnd.ms-excel"
+    
+)
+
+#st.button('Download XLS',on_click=download)
 st.write('The file will be downloaded to the Desktop')
